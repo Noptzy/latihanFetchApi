@@ -7,7 +7,7 @@ fetch("http://localhost:3000/api/users", {
   .then((response) => response.json())
   .then((data) => {
     data.data.forEach((user) => {
-        console.log(`Name: ${user.name}, Email: ${user.email}`);
+        console.log(`ID: ${user.id}, Name: ${user.name}, Email: ${user.email}`);
     });
   })
   .catch((error) => {
