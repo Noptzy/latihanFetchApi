@@ -51,7 +51,7 @@ exports.getUser = async (req, res) => {
 
 exports.storeUser = async (req, res) => {
   try {
-    const { email, username, password } = req.body;
+    const { email, name, password } = req.body;
 
     const checkEmail = await UserServices.findUser({ email });
 
@@ -66,7 +66,7 @@ exports.storeUser = async (req, res) => {
     }
     const hashedPassword = await bcrypt.hash(password, 10);
     const newUser = await UserServices.storeUser({
-      username,
+      name,
       email,
       password: hashedPassword,
     });
