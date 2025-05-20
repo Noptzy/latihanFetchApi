@@ -1,169 +1,151 @@
+const UserServices = require("../services/userService.js");
+const responseHandler = require("../utils/responseHandler.js");
+const { Op } = require("sequelize");
 const bcrypt = require("bcryptjs");
-const User = require("../models/user.js");
 
-exports.createUser = async (req, res) => {
+exports.getUsers = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { page = 1, limit = 10, offset, ...filters } = req.query;
+    const calculatedOffset = (page - 1) * limit;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-        code: 400,
-      });
-    }
-    const existingUser = await User.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "User already exists",
-        code: 400,
-      });
-    }
+    const where = {};
 
+    Object.keys(filters).forEach((key) => {
+      if (filters[key]) {
+        where[key] = filters[key];
+      }
+    });
+
+    const users = await UserServices.findUsers({
+      ...(Object.keys(where).length > 0 && { where }),
+      offset: parseInt(calculatedOffset),
+      limit: parseInt(limit),
+      page: parseInt(page),
+    });
+    return res.json(
+      responseHandler.success("success get users", users).toJSON()
+    );
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json(responseHandler.error("failed get users", null).toJSON());
+  }
+};
+
+exports.getUser = async (req, res) => {
+  try {
+    const user = await UserServices.getUser(req.params.id);
+    return user
+      ? res.json(responseHandler.success("success get user", user).toJSON())
+      : res
+          .status(404)
+          .json(responseHandler.error("user not found", null).toJSON());
+  } catch (error) {
+    console.log(error);
+    return res
+      .status(500)
+      .json(responseHandler.error("failed get user", null).toJSON());
+  }
+};
+
+exports.storeUser = async (req, res) => {
+  try {
+    const { email, username, password } = req.body;
+
+    const checkEmail = await UserServices.findUser({ email });
+
+    if (checkEmail) {
+      return res
+        .status(400)
+        .json(
+          responseHandler
+            .error("Validation Error", { email: "Email Has Been Used" })
+            .toJSON()
+        );
+    }
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      name,
+    const newUser = await UserServices.storeUser({
+      username,
       email,
       password: hashedPassword,
     });
 
-    res.status(201).json({
-      success: true,
-      message: "User created successfully",
-      data: user,
-      code: 201,
-    });
+    return res
+      .status(201)
+      .json(responseHandler.success("User Created", newUser).toJSON());
   } catch (error) {
-    console.error("Error creating user:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      code: 500,
-    });
-  }
-};
-
-exports.getAllUsers = async (req, res) => {
-  try {
-    const users = await User.findAll();
-    if (users.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No users found",
-        code: 404,
-      });
-    }
-    res.status(200).json({
-      success: true,
-      message: "Users fetched successfully",
-      data: users,
-      code: 200,
-    });
-  } catch (error) {
-    console.error("Error fetching users:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      code: 500,
-    });
-  }
-};
-
-exports.getUserById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const user = await User.findByPk(id);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        code: 404,
-      });
-    }
-    res.status(200).json({
-      success: true,
-      message: "User fetched successfully",
-      data: user,
-      code: 200,
-    });
-  } catch (error) {
-    console.error("Error fetching user:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      code: 500,
-    });
+    console.log(error);
+    return res.status(500).json(responseHandler.error("error", null).toJSON());
   }
 };
 
 exports.updateUser = async (req, res) => {
   try {
+    const { email, name, password } = req.body;
     const { id } = req.params;
-    const { name, email, password } = req.body;
+    const user = await UserServices.getUser(id);
 
-    if (!name || !email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-        code: 400,
-      });
-    }
-
-    const user = await User.findByPk(id);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        code: 404,
-      });
+      return res
+        .status(404)
+        .json(responseHandler.error("User not found", null).toJSON());
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
-    user.name = name;
-    user.email = email;
-    user.password = hashedPassword;
-    await user.save();
+    if (email && email !== user.email) {
+      const emailInUse = await UserServices.findUser({ email });
+      if (emailInUse) {
+        return res
+          .status(400)
+          .json(
+            responseHandler
+              .error("Validation Error", { email: "Email telah digunakan" })
+              .toJSON()
+          );
+      }
+    }
 
-    res.status(200).json({
-      success: true,
-      message: "User updated successfully",
-      data: user,
-      code: 200,
-    });
+    const updateData = {
+      name,
+      email,
+      ...(password && { password }),
+    };
+    
+    if (password) {
+      updateData.password = await bcrypt.hash(password, 10);
+    }
+
+    const updatedUser = await UserServices.updateUser(id, updateData);
+
+    return res
+      .status(200)
+      .json(
+        responseHandler
+          .success("User updated successfully", updatedUser)
+          .toJSON()
+      );
   } catch (error) {
-    console.error("Error updating user:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      code: 500,
-    });
+    console.log(error);
+    return res.status(500).json(responseHandler.error("error", null).toJSON());
   }
 };
 
 exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findByPk(id);
+    const user = await UserServices.deleteUser(id);
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-        code: 404,
-      });
+      return res
+        .status(404)
+        .json(responseHandler.error("User Not Found", null).toJSON());
     }
-    await user.destroy();
-    res.status(200).json({
-      success: true,
-      message: "User deleted successfully",
-      code: 200,
-    });
+    return res
+      .status(200)
+      .json(
+        responseHandler.success("User deleted successfully", null).toJSON()
+      );
   } catch (error) {
-    console.error("Error deleting user:", error);
-    res.status(500).json({
-      success: false,
-      message: "Internal server error",
-      code: 500,
-    });
+    console.log(error);
+    return res.status(500).json(responseHandler.error("error", null).toJSON());
   }
 };
