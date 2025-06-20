@@ -12,8 +12,10 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use('/uploads', express.static('uploads'));
 app.use('/api/v1', apiV1);
 app.get((req, res) => {
     return res.status(404).json({ message: '404 Not Found' });
 });
-app.listen(port)
+
+module.exports = app

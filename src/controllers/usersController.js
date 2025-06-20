@@ -156,6 +156,10 @@ exports.updateUser = async (req, res) => {
             updateData.password = await bcrypt.hash(password, 10);
         }
 
+        if(req.file){
+            updateData.photoProfile = req.file.filename
+        }
+
         await UserService.updateUser(id, updateData);
 
         const updatedUser = await UserService.getUser(id);

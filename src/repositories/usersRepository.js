@@ -63,6 +63,7 @@ class UsersRepository {
                     name: data.name,
                     email: data.email,
                     ...(data.password && { password: data.password }),
+                    ...(data.photoProfile && { photoProfile: data.photoProfile }), 
                 },
                 { transaction }
             );

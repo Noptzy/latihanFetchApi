@@ -37,6 +37,7 @@ const updateUserSchema = Joi.object({
         "string.max": "New password must be at most 30 characters",
         "string.pattern.base": "New password must be 8-30 alphanumeric characters",
     }),
+    photoProfile: Joi.any().optional()
 });
 
 const loginUserSchema = Joi.object({
